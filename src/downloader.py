@@ -168,7 +168,7 @@ def get_pypi_download_info(session: requests.Session, task: PackageTask) -> tupl
 
 
 def get_npm_download_info(session: requests.Session, task: PackageTask) -> tuple[str, str]:
-    encoded_name = quote(task.name, safe="")
+    encoded_name = quote(task.name, safe="@")
     if task.version:
         metadata_url = f"{NPM_ROOT}/{encoded_name}/{task.version}"
     else:
