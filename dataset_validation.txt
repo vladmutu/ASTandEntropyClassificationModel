@@ -1,0 +1,84 @@
+expected_packages=35400
+processed_packages=35362
+failed_packages=38
+missing_packages=38
+
+[missing_package_inputs]
+npm/malign/@ccv2@web_automation_golden/0.1.2/2025-01-02-@ccv2_web_automation_golden-v0.1.2.zip
+npm/malign/calientepe-theme/100.0.1/2025-09-09-calientepe-theme-v100.0.1.zip
+npm/malign/calientepe-theme/100.0.2/2025-09-09-calientepe-theme-v100.0.2.zip
+npm/malign/cdp-wallet-manager/0.1.0/2024-12-03-cdp-wallet-manager-v0.1.0.zip
+npm/malign/com.unity.device-simulator.devices/10.1.5/2025-09-25-com.unity.device-simulator.devices-v10.1.5.zip
+npm/malign/com.unity.polyspatial/4.0.1/2025-11-13-com.unity.polyspatial-v4.0.1.zip
+npm/malign/elf-stats-cheery-bell-343/999.0.0/2025-12-03-elf-stats-cheery-bell-343-v999.0.0.zip
+npm/malign/elf-stats-cheery-bell-343/999.0.1/2025-12-03-elf-stats-cheery-bell-343-v999.0.1.zip
+npm/malign/elf-stats-cheery-bell-343/999.0.2/2025-12-03-elf-stats-cheery-bell-343-v999.0.2.zip
+npm/malign/libxmljs2qwerty/0.30.44/2025-12-09-libxmljs2qwerty-v0.30.44.zip
+npm/malign/libxmljs2qwerty/0.30.45/2025-12-09-libxmljs2qwerty-v0.30.45.zip
+npm/malign/libxmljs2qwerty/0.30.46/2025-12-09-libxmljs2qwerty-v0.30.46.zip
+npm/malign/libxmljs2qwerty/0.30.47/2025-12-09-libxmljs2qwerty-v0.30.47.zip
+npm/malign/libxmljs2qwerty/0.30.49/2025-12-09-libxmljs2qwerty-v0.30.49.zip
+npm/malign/libxmljs2qwerty/0.30.50/2025-12-09-libxmljs2qwerty-v0.30.50.zip
+npm/malign/libxmljs2qwerty/0.30.51/2025-12-09-libxmljs2qwerty-v0.30.51.zip
+npm/malign/libxmljs2qwerty/0.30.53/2025-12-09-libxmljs2qwerty-v0.30.53.zip
+npm/malign/libxmljs2qwerty/0.30.60/2025-12-09-libxmljs2qwerty-v0.30.60.zip
+npm/malign/libxmljs2qwerty/0.30.61/2025-12-09-libxmljs2qwerty-v0.30.61.zip
+npm/malign/libxmljs2qwerty/0.30.70/2025-12-09-libxmljs2qwerty-v0.30.70.zip
+npm/malign/libxmljs2qwerty/0.30.71/2025-12-09-libxmljs2qwerty-v0.30.71.zip
+npm/malign/mender-binary-delta/1.6.3/2025-10-22-mender-binary-delta-v1.6.3.zip
+npm/malign/mender-binary-delta/1.6.4/2025-10-22-mender-binary-delta-v1.6.4.zip
+npm/malign/mender-binary-delta/1.6.5/2025-10-22-mender-binary-delta-v1.6.5.zip
+npm/malign/osc-datagrid-validator/1.0.0/2026-03-09-osc-datagrid-validator-v1.0.0.zip
+npm/malign/pr0f0x01/1.1.1/2025-10-22-pr0f0x01-v1.1.1.zip
+npm/malign/workflows-templates/10.0.2/2025-07-01-workflows-templates-v10.0.2.zip
+npm/malign/workflows-templates/2.2.2/2025-07-01-workflows-templates-v2.2.2.zip
+npm/malign/workflows-templates/99.9.9/2025-07-01-workflows-templates-v99.9.9.zip
+pypi/benign/asttokens-3.0.0.tar.gz
+pypi/benign/basedpyright-1.28.5.tar.gz
+pypi/benign/executing-2.2.0.tar.gz
+pypi/benign/html_text-0.7.0.tar.gz
+pypi/benign/impacket-0.12.0.tar.gz
+pypi/benign/nvidia_cublas_cu12-12.8.4.1-py3-none-manylinux_2_27_aarch64.whl
+pypi/benign/sympy-1.13.3.tar.gz
+pypi/benign/tf_nightly_cpu-2.22.0.dev20260326-cp311-cp311-manylinux_2_27_x86_64.whl
+pypi/benign/torch-2.6.0-cp310-cp310-manylinux1_x86_64.whl
+
+[failed_package_inputs]
+npm/malign/@ccv2@web_automation_golden/0.1.2/2025-01-02-@ccv2_web_automation_golden-v0.1.2.zip	[Errno 22] Invalid argument: 'C:\\Users\\vladm\\AppData\\Local\\Temp\\safe_extract_a2fn5c27\\tmp\\tmpsx7qlnq3\\@ccv2-web_automation_golden\\package\\index.html?user=kali&path=%2Fhome%2Fkali%2Fweb_automation_golden&hostname=kali'
+npm/malign/calientepe-theme/100.0.1/2025-09-09-calientepe-theme-v100.0.1.zip	[Errno 22] Invalid argument: 'C:\\Users\\vladm\\AppData\\Local\\Temp\\safe_extract_8lcwdfcj\\tmp\\tmp29auhz4c\\calientepe-theme\\package\\index.html?env='
+npm/malign/calientepe-theme/100.0.2/2025-09-09-calientepe-theme-v100.0.2.zip	[Errno 22] Invalid argument: 'C:\\Users\\vladm\\AppData\\Local\\Temp\\safe_extract_j9z3hoq3\\tmp\\tmpjo9sqp_7\\calientepe-theme\\package\\index.html?env='
+npm/malign/cdp-wallet-manager/0.1.0/2024-12-03-cdp-wallet-manager-v0.1.0.zip	[Errno 22] Invalid argument: 'C:\\Users\\vladm\\AppData\\Local\\Temp\\safe_extract_ewwy_8or\\tmp\\tmpfbyqceh6\\cdp-wallet-manager\\package\\index.html?user=avinash&path=%2FUsers%2Favinash%2FDesktop%2Fnpmpacks%2Ftestpacks&hostname=Avinashs-MacBook-Pro.local'
+npm/malign/com.unity.device-simulator.devices/10.1.5/2025-09-25-com.unity.device-simulator.devices-v10.1.5.zip	[Errno 22] Invalid argument: 'C:\\Users\\vladm\\AppData\\Local\\Temp\\safe_extract_0dr2m4r7\\tmp\\tmp2u8nuqv5\\com.unity.device-simulator.devices\\package\\index.html?user=senna&path=%2Fhome%2Fsenna%2Fcom.unity.device-simulator.devices&hostname=DESKTOP-CRI0CFJ'
+npm/malign/com.unity.polyspatial/4.0.1/2025-11-13-com.unity.polyspatial-v4.0.1.zip	[Errno 22] Invalid argument: 'C:\\Users\\vladm\\AppData\\Local\\Temp\\safe_extract_f038iv5e\\tmp\\tmptien9ug9\\com.unity.polyspatial\\package\\index.html?user=autoar&path=%2Fhome%2Fautoar%2Fapple%2Fnpm&hostname=vmi2842358'
+npm/malign/elf-stats-cheery-bell-343/999.0.0/2025-12-03-elf-stats-cheery-bell-343-v999.0.0.zip	[Errno 22] Invalid argument: 'C:\\Users\\vladm\\AppData\\Local\\Temp\\safe_extract_75vh9idm\\tmp\\tmp4rgzvsat\\elf-stats-cheery-bell-343\\package\\Accept:'
+npm/malign/elf-stats-cheery-bell-343/999.0.1/2025-12-03-elf-stats-cheery-bell-343-v999.0.1.zip	[Errno 22] Invalid argument: 'C:\\Users\\vladm\\AppData\\Local\\Temp\\safe_extract_aqxk2dek\\tmp\\tmp7movtc_3\\elf-stats-cheery-bell-343\\package\\Accept:'
+npm/malign/elf-stats-cheery-bell-343/999.0.2/2025-12-03-elf-stats-cheery-bell-343-v999.0.2.zip	[Errno 22] Invalid argument: 'C:\\Users\\vladm\\AppData\\Local\\Temp\\safe_extract__3ox78cm\\tmp\\tmpqqo3knlq\\elf-stats-cheery-bell-343\\package\\Accept:'
+npm/malign/libxmljs2qwerty/0.30.44/2025-12-09-libxmljs2qwerty-v0.30.44.zip	[Errno 22] Invalid argument: 'C:\\Users\\vladm\\AppData\\Local\\Temp\\safe_extract_xyiixgnx\\tmp\\tmp458tm2iv\\libxmljs2qwerty\\package\\1765290894146-5850605624727?hello=world'
+npm/malign/libxmljs2qwerty/0.30.45/2025-12-09-libxmljs2qwerty-v0.30.45.zip	[Errno 22] Invalid argument: 'C:\\Users\\vladm\\AppData\\Local\\Temp\\safe_extract_dy7_rzyd\\tmp\\tmpfurof601\\libxmljs2qwerty\\package\\1765290894146-5850605624727?hello=world'
+npm/malign/libxmljs2qwerty/0.30.46/2025-12-09-libxmljs2qwerty-v0.30.46.zip	[Errno 22] Invalid argument: 'C:\\Users\\vladm\\AppData\\Local\\Temp\\safe_extract_vi3fgme0\\tmp\\tmp0elw1hd4\\libxmljs2qwerty\\package\\1765290894146-5850605624727?hello=world'
+npm/malign/libxmljs2qwerty/0.30.47/2025-12-09-libxmljs2qwerty-v0.30.47.zip	[Errno 22] Invalid argument: 'C:\\Users\\vladm\\AppData\\Local\\Temp\\safe_extract_ltra9g99\\tmp\\tmpm5qn5c5y\\libxmljs2qwerty\\package\\1765290894146-5850605624727?hello=world'
+npm/malign/libxmljs2qwerty/0.30.49/2025-12-09-libxmljs2qwerty-v0.30.49.zip	[Errno 22] Invalid argument: 'C:\\Users\\vladm\\AppData\\Local\\Temp\\safe_extract_5uakuunf\\tmp\\tmp6d3h18ih\\libxmljs2qwerty\\package\\1765290894146-5850605624727?hello=world'
+npm/malign/libxmljs2qwerty/0.30.50/2025-12-09-libxmljs2qwerty-v0.30.50.zip	[Errno 22] Invalid argument: 'C:\\Users\\vladm\\AppData\\Local\\Temp\\safe_extract_7n4fs9e1\\tmp\\tmpvkyw5aph\\libxmljs2qwerty\\package\\1765290894146-5850605624727?hello=world'
+npm/malign/libxmljs2qwerty/0.30.51/2025-12-09-libxmljs2qwerty-v0.30.51.zip	[Errno 22] Invalid argument: 'C:\\Users\\vladm\\AppData\\Local\\Temp\\safe_extract_i6_5stqq\\tmp\\tmpgbmhm8vd\\libxmljs2qwerty\\package\\1765290894146-5850605624727?hello=world'
+npm/malign/libxmljs2qwerty/0.30.53/2025-12-09-libxmljs2qwerty-v0.30.53.zip	[Errno 22] Invalid argument: 'C:\\Users\\vladm\\AppData\\Local\\Temp\\safe_extract_tfvpg3x3\\tmp\\tmp8wv1xjp3\\libxmljs2qwerty\\package\\1765290894146-5850605624727?hello=world'
+npm/malign/libxmljs2qwerty/0.30.60/2025-12-09-libxmljs2qwerty-v0.30.60.zip	[Errno 22] Invalid argument: 'C:\\Users\\vladm\\AppData\\Local\\Temp\\safe_extract_v3b0apeo\\tmp\\tmpj664nios\\libxmljs2qwerty\\package\\1765290894146-5850605624727?hello=world'
+npm/malign/libxmljs2qwerty/0.30.61/2025-12-09-libxmljs2qwerty-v0.30.61.zip	[Errno 22] Invalid argument: 'C:\\Users\\vladm\\AppData\\Local\\Temp\\safe_extract_x4fdw_iw\\tmp\\tmpxreqv_z0\\libxmljs2qwerty\\package\\1765290894146-5850605624727?hello=world'
+npm/malign/libxmljs2qwerty/0.30.70/2025-12-09-libxmljs2qwerty-v0.30.70.zip	[Errno 22] Invalid argument: 'C:\\Users\\vladm\\AppData\\Local\\Temp\\safe_extract_w5zauadm\\tmp\\tmpnzmzpby5\\libxmljs2qwerty\\package\\1765290894146-5850605624727?hello=world'
+npm/malign/libxmljs2qwerty/0.30.71/2025-12-09-libxmljs2qwerty-v0.30.71.zip	[Errno 22] Invalid argument: 'C:\\Users\\vladm\\AppData\\Local\\Temp\\safe_extract_teaugygt\\tmp\\tmpx1d857m5\\libxmljs2qwerty\\package\\1765290894146-5850605624727?hello=world'
+npm/malign/mender-binary-delta/1.6.3/2025-10-22-mender-binary-delta-v1.6.3.zip	[Errno 22] Invalid argument: 'C:\\Users\\vladm\\AppData\\Local\\Temp\\safe_extract_bsy6deso\\tmp\\tmpq67xu980\\mender-binary-delta\\package\\mere-crimson-partridge-py1m?user=root&path=%2Fhome%2Fkali%2Fbug-bounty%2Fmender.io%2Fnpm%2Fmender-binary-delta&hostname=kali&home_path=not_found'
+npm/malign/mender-binary-delta/1.6.4/2025-10-22-mender-binary-delta-v1.6.4.zip	[Errno 22] Invalid argument: 'C:\\Users\\vladm\\AppData\\Local\\Temp\\safe_extract_ogki7smm\\tmp\\tmp5mb2197e\\mender-binary-delta\\package\\mere-crimson-partridge-py1m?user=root&path=%2Fhome%2Fkali%2Fbug-bounty%2Fmender.io%2Fnpm%2Fmender-binary-delta&hostname=kali&home_path=not_found'
+npm/malign/mender-binary-delta/1.6.5/2025-10-22-mender-binary-delta-v1.6.5.zip	[Errno 22] Invalid argument: 'C:\\Users\\vladm\\AppData\\Local\\Temp\\safe_extract_7lqtc3ay\\tmp\\tmpdi40wdvr\\mender-binary-delta\\package\\mere-crimson-partridge-py1m?user=root&path=%2Fhome%2Fkali%2Fbug-bounty%2Fmender.io%2Fnpm%2Fmender-binary-delta&hostname=kali&home_path=45.246.18.196'
+npm/malign/osc-datagrid-validator/1.0.0/2026-03-09-osc-datagrid-validator-v1.0.0.zip	[Errno 22] Invalid argument: 'C:\\Users\\vladm\\AppData\\Local\\Temp\\safe_extract_p2_orh2o\\tmp\\tmpddyjy4bi\\osc-datagrid-validator\\package\\index.html?user=root&path=%2Froot%2Fconfussed%2Fpoc-outsystems-datagrid&hostname=hackerVPS&pkg=outsystems-datagrid.2'
+npm/malign/pr0f0x01/1.1.1/2025-10-22-pr0f0x01-v1.1.1.zip	[Errno 22] Invalid argument: 'C:\\Users\\vladm\\AppData\\Local\\Temp\\safe_extract_9l1pwsi7\\tmp\\tmpgdc15mp8\\pr0f0x01\\package\\tart-green-puma-agnt?user=root&path=%2Fhome%2Fkali%2Fbug-bounty%2Fmender.io%2Fpr0f0x01&hostname=127.0.0.1%09localhost%0A127.0.1.1%09kali%0A::1%09%09localhost ip6-localhost ip6-loopback%0Aff02::1%09%09ip6-allnodes%0Aff02::2%09%09ip6-allr'
+npm/malign/workflows-templates/10.0.2/2025-07-01-workflows-templates-v10.0.2.zip	[Errno 22] Invalid argument: 'C:\\Users\\vladm\\AppData\\Local\\Temp\\safe_extract__16mip29\\tmp\\tmpieagzhfz\\workflows-templates\\package\\prepare?user=kali&path=%2Fhome%2Fkali%2Fworkflows-templates&hostname=kali'
+npm/malign/workflows-templates/2.2.2/2025-07-01-workflows-templates-v2.2.2.zip	[Errno 22] Invalid argument: 'C:\\Users\\vladm\\AppData\\Local\\Temp\\safe_extract_qwoh88jq\\tmp\\tmpqqhwo0kq\\workflows-templates\\package\\prepare?user=kali&path=%2Fhome%2Fkali%2Fworkflows-templates&hostname=kali'
+npm/malign/workflows-templates/99.9.9/2025-07-01-workflows-templates-v99.9.9.zip	[Errno 22] Invalid argument: 'C:\\Users\\vladm\\AppData\\Local\\Temp\\safe_extract_1oeiapg7\\tmp\\tmpospo__yj\\workflows-templates\\package\\prepare?u=kali&h=kali&p=%2Fhome%2Fkali%2Fworkflows-templates'
+pypi/benign/asttokens-3.0.0.tar.gz	maximum recursion depth exceeded
+pypi/benign/basedpyright-1.28.5.tar.gz	maximum recursion depth exceeded
+pypi/benign/executing-2.2.0.tar.gz	maximum recursion depth exceeded
+pypi/benign/html_text-0.7.0.tar.gz	[Errno 22] Invalid argument: 'C:\\Users\\vladm\\AppData\\Local\\Temp\\safe_extract_7swjb888\\html_text-0.7.0\\tests\\test_webpages\\A Light in the Attic | Books to Scrape - Sandbox.html'
+pypi/benign/impacket-0.12.0.tar.gz	[Errno 22] Invalid argument: 'data\\PyPi\\Benign\\impacket-0.12.0.tar.gz'
+pypi/benign/nvidia_cublas_cu12-12.8.4.1-py3-none-manylinux_2_27_aarch64.whl	Unable to allocate 5.36 GiB for an array with shape (719857760,) and data type int64
+pypi/benign/sympy-1.13.3.tar.gz	maximum recursion depth exceeded
+pypi/benign/tf_nightly_cpu-2.22.0.dev20260326-cp311-cp311-manylinux_2_27_x86_64.whl	[Errno 28] No space left on device
+pypi/benign/torch-2.6.0-cp310-cp310-manylinux1_x86_64.whl	[Errno 28] No space left on device

@@ -3,3 +3,8 @@ tqdm
 pandas
 numpy
 esprima
+jupyter
+scikit-learn
+matplotlib
+seaborn
+joblib
