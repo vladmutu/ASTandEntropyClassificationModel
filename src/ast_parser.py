@@ -6,6 +6,7 @@ import esprima
 
 
 NETWORK_MODULE_PREFIXES = ("requests", "socket", "urllib")
+MAX_AST_FILE_SIZE = 1_000_000
 
 
 def _init_feature_counts() -> dict[str, int]:
@@ -57,6 +58,54 @@ class _PythonDangerVisitor(ast.NodeVisitor):
 def _merge_counts(target: dict[str, int], source: dict[str, int]) -> None:
     for key, value in source.items():
         target[key] = target.get(key, 0) + value
+
+
+def _safe_read_text(file_path: Path) -> str:
+    try:
+        return file_path.read_text(encoding="utf-8", errors="ignore")
+    except Exception:
+        return ""
+
+
+def _fast_scan_python_text(source: str) -> dict[str, int]:
+    counts = _init_feature_counts()
+    if not source:
+        return counts
+
+    counts["eval_count"] = source.count("eval(")
+    counts["exec_count"] = source.count("exec(")
+    counts["base64_count"] = source.count("base64.b64decode(")
+
+    network_patterns = (
+        "import requests",
+        "from requests",
+        "import socket",
+        "from socket",
+        "import urllib",
+        "from urllib",
+    )
+    counts["network_imports"] = sum(source.count(pattern) for pattern in network_patterns)
+    return counts
+
+
+def _fast_scan_javascript_text(source: str) -> dict[str, int]:
+    counts = _init_feature_counts()
+    if not source:
+        return counts
+
+    counts["eval_count"] = source.count("eval(")
+
+    settimeout_count = source.count("setTimeout(")
+    child_process_count = (
+        source.count("require('child_process')")
+        + source.count('require("child_process")')
+    )
+
+    counts["settimeout_string_count"] = settimeout_count
+    counts["child_process_count"] = child_process_count
+    counts["exec_count"] = settimeout_count + child_process_count
+    counts["buffer_count"] = source.count("Buffer")
+    return counts
 
 
 def _is_js_string_literal(node: Any) -> bool:
@@ -116,7 +165,16 @@ def _walk_js(node: Any, counts: dict[str, int]) -> None:
 
 def analyze_python_file(file_path: Path) -> dict[str, int]:
     try:
-        source = file_path.read_text(encoding="utf-8", errors="ignore")
+        if file_path.stat().st_size > MAX_AST_FILE_SIZE:
+            source = _safe_read_text(file_path)
+            return _fast_scan_python_text(source)
+    except OSError:
+        return _init_feature_counts()
+
+    try:
+        source = _safe_read_text(file_path)
+        if not source:
+            return _init_feature_counts()
         tree = ast.parse(source)
     except Exception:
         return _init_feature_counts()
@@ -129,7 +187,16 @@ def analyze_python_file(file_path: Path) -> dict[str, int]:
 def analyze_javascript_file(file_path: Path) -> dict[str, int]:
     counts = _init_feature_counts()
     try:
-        source = file_path.read_text(encoding="utf-8", errors="ignore")
+        if file_path.stat().st_size > MAX_AST_FILE_SIZE:
+            source = _safe_read_text(file_path)
+            return _fast_scan_javascript_text(source)
+    except OSError:
+        return counts
+
+    try:
+        source = _safe_read_text(file_path)
+        if not source:
+            return counts
     except Exception:
         return counts
 

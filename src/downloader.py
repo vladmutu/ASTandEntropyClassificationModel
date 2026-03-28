@@ -53,11 +53,33 @@ def parse_pypi_spec(spec: str) -> tuple[str, Optional[str]]:
     if "==" in clean:
         name, version = clean.split("==", 1)
         return name.strip(), version.strip() or None
-    return clean, None
+
+    lowered = clean.lower()
+    stripped = clean
+    if lowered.endswith(".tar.gz"):
+        stripped = clean[: -len(".tar.gz")]
+    elif lowered.endswith(".tgz"):
+        stripped = clean[: -len(".tgz")]
+    elif lowered.endswith(".whl"):
+        wheel_base = clean[: -len(".whl")]
+        wheel_parts = wheel_base.split("-")
+        if len(wheel_parts) >= 5:
+            stripped = "-".join(wheel_parts[:-3])
+        else:
+            stripped = wheel_base
+
+    parts = re.split(r"-(?=\d)", stripped, maxsplit=1)
+    if len(parts) == 2:
+        return parts[0].strip(), parts[1].strip() or None
+
+    return stripped.strip(), None
 
 
 def parse_npm_spec(spec: str) -> tuple[str, Optional[str]]:
     clean = spec.strip()
+    clean = clean.replace("##", "/")
+    if clean.lower().endswith(".tgz"):
+        clean = clean[: -len(".tgz")]
 
     # Scoped packages can look like @scope/name@1.2.3; split on the last @.
     if clean.startswith("@"):
@@ -67,11 +89,20 @@ def parse_npm_spec(spec: str) -> tuple[str, Optional[str]]:
             version = clean[last_at + 1 :].strip()
             if "/" in name and version:
                 return name.strip(), version
+
+        parts = re.split(r"-(?=\d)", clean, maxsplit=1)
+        if len(parts) == 2 and "/" in parts[0]:
+            return parts[0].strip(), parts[1].strip() or None
+
         return clean, None
 
     match = re.match(r"^(?P<name>[^@\s]+)@(?P<version>[^\s]+)$", clean)
     if match:
         return match.group("name"), match.group("version")
+
+    parts = re.split(r"-(?=\d)", clean, maxsplit=1)
+    if len(parts) == 2:
+        return parts[0].strip(), parts[1].strip() or None
 
     return clean, None
 
@@ -132,14 +163,25 @@ def log_missing(log_path: Path, task: PackageTask, reason: str) -> None:
 
 
 def get_pypi_download_info(session: requests.Session, task: PackageTask) -> tuple[str, str]:
-    package_name = task.name
+    package_name = re.sub(r"[-_.]+", "-", task.name).lower()
     if task.version:
         metadata_url = f"{PYPI_ROOT}/{package_name}/{task.version}/json"
     else:
         metadata_url = f"{PYPI_ROOT}/{package_name}/json"
 
-    response = session.get(metadata_url, timeout=REQUEST_TIMEOUT)
-    response.raise_for_status()
+    try:
+        print(f"  -> Querying PyPI API: {metadata_url}")
+        response = session.get(metadata_url, timeout=REQUEST_TIMEOUT)
+        response.raise_for_status()
+    except requests.HTTPError:
+        if task.version is not None:
+            metadata_url = f"{PYPI_ROOT}/{package_name}/json"
+            print(f"  -> Querying PyPI API: {metadata_url}")
+            response = session.get(metadata_url, timeout=REQUEST_TIMEOUT)
+            response.raise_for_status()
+        else:
+            raise
+
     payload = response.json()
 
     candidates = payload.get("urls", [])
@@ -174,8 +216,19 @@ def get_npm_download_info(session: requests.Session, task: PackageTask) -> tuple
     else:
         metadata_url = f"{NPM_ROOT}/{encoded_name}/latest"
 
-    response = session.get(metadata_url, timeout=REQUEST_TIMEOUT)
-    response.raise_for_status()
+    try:
+        print(f"  -> Querying NPM API: {metadata_url}")
+        response = session.get(metadata_url, timeout=REQUEST_TIMEOUT)
+        response.raise_for_status()
+    except requests.HTTPError:
+        if task.version is not None:
+            metadata_url = f"{NPM_ROOT}/{encoded_name}/latest"
+            print(f"  -> Querying NPM API: {metadata_url}")
+            response = session.get(metadata_url, timeout=REQUEST_TIMEOUT)
+            response.raise_for_status()
+        else:
+            raise
+
     payload = response.json()
 
     tarball_url = payload.get("dist", {}).get("tarball")

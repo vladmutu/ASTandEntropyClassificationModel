@@ -9,6 +9,9 @@ from typing import Iterator
 from entropy import calculate_shannon_entropy
 
 
+ZIP_PASSWORD_CANDIDATES = (b"infected",)
+
+
 @dataclass
 class PackageEntropyResult:
     archive_path: Path
@@ -50,8 +53,30 @@ class SafeExtractor:
                 name = info.filename
                 if name.endswith("/"):
                     continue
-                self._safe_join(destination, name)
-                archive.extract(info, path=destination)
+
+                destination_path = self._safe_join(destination, name)
+                destination_path.parent.mkdir(parents=True, exist_ok=True)
+
+                # Some malware corpora ship encrypted ZIPs (e.g., password "infected").
+                if info.flag_bits & 0x1:
+                    extracted = False
+                    for password in ZIP_PASSWORD_CANDIDATES:
+                        try:
+                            with archive.open(info, mode="r", pwd=password) as source_stream:
+                                destination_path.write_bytes(source_stream.read())
+                            extracted = True
+                            break
+                        except RuntimeError:
+                            continue
+
+                    if not extracted:
+                        raise RuntimeError(
+                            f"Encrypted ZIP member could not be extracted with known passwords: {info.filename}"
+                        )
+                    continue
+
+                with archive.open(info, mode="r") as source_stream:
+                    destination_path.write_bytes(source_stream.read())
 
     def _extract_archive(self, destination: Path) -> None:
         suffixes = [s.lower() for s in self.archive_path.suffixes]
@@ -81,7 +106,10 @@ class SafeExtractor:
         with self.extracted_tree() as extraction_dir:
             entropies: list[float] = []
             for extracted_file in self.iter_files(extraction_dir):
-                data = extracted_file.read_bytes()
+                try:
+                    data = extracted_file.read_bytes()
+                except OSError:
+                    continue
                 entropies.append(calculate_shannon_entropy(data))
 
             if entropies:
