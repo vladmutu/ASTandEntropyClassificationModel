@@ -19,7 +19,7 @@ spec:
           image: malware-classifier/coordinator:latest
           imagePullPolicy: IfNotPresent
           ports:
-            - containerPort: 8000
+            - containerPort: 8090
           env:
             - name: REDIS_URL
               value: redis://redis:6379
@@ -30,13 +30,13 @@ spec:
           readinessProbe:
             httpGet:
               path: /health
-              port: 8000
+              port: 8090
             initialDelaySeconds: 5
             periodSeconds: 5
           livenessProbe:
             httpGet:
               path: /health
-              port: 8000
+              port: 8090
             initialDelaySeconds: 10
             periodSeconds: 10
           resources:
