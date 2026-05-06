@@ -6,6 +6,7 @@ from typing import Optional
 
 import joblib
 import numpy as np
+import pandas as pd
 import redis as redis_lib
 
 MODEL_PATH = os.getenv("MODEL_PATH", "lightgbm_model.pkl")
@@ -88,7 +89,7 @@ def analyze_package(
         features["obfuscation_index"] = features["entropy_gap"] * float(np.log1p(features.get("base64_count", 0.0)))
 
         # Build the feature vector in column order from training
-        X = np.array([[features.get(col, 0.0) for col in feature_columns]])
+        X = pd.DataFrame([[features.get(col, 0.0) for col in feature_columns]], columns=feature_columns)
         prob = float(model.predict_proba(X)[0, 1])
         verdict = "malicious" if prob >= threshold else "benign"
 
@@ -145,7 +146,7 @@ def analyze_uploaded_package(
         features["network_exec_ratio"] = features.get("network_call_count", 0.0) / (features.get("exec_count", 0.0) + 1.0)
         features["obfuscation_index"] = features["entropy_gap"] * float(np.log1p(features.get("base64_count", 0.0)))
 
-        X = np.array([[features.get(col, 0.0) for col in feature_columns]])
+        X = pd.DataFrame([[features.get(col, 0.0) for col in feature_columns]], columns=feature_columns)
         prob = float(model.predict_proba(X)[0, 1])
         verdict = "malicious" if prob >= threshold else "benign"
 

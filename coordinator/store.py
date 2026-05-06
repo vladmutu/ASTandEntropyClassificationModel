@@ -67,36 +67,38 @@ def get_job(r: redis_lib.Redis, job_id: str) -> Optional[JobResponse]:
     if not meta:
         return None
 
-    prefix = f"job:{job_id}:pkg:"
-    pkg_keys = list(r.scan_iter(f"{prefix}*"))
+    pkg_keys = list(r.scan_iter(f"job:{job_id}:pkg:*"))
 
     packages: list[PackageResult] = []
-    for pk in pkg_keys:
-        data = r.hgetall(pk)
-        if not data:
-            continue
+    if pkg_keys:
+        pipe = r.pipeline()
+        for pk in pkg_keys:
+            pipe.hgetall(pk)
+        all_data = pipe.execute()
 
-        features: Optional[dict] = None
-        raw_features = data.get("features")
-        if raw_features:
-            try:
-                features = json.loads(raw_features)
-            except (json.JSONDecodeError, TypeError):
-                pass
+        for data in all_data:
+            if not data:
+                continue
 
-        raw_prob = data.get("probability")
-        probability = float(raw_prob) if raw_prob else None
+            features: Optional[dict] = None
+            raw_features = data.get("features")
+            if raw_features:
+                try:
+                    features = json.loads(raw_features)
+                except (json.JSONDecodeError, TypeError):
+                    pass
 
-        packages.append(PackageResult(
-            name=data.get("name", ""),
-            version=data.get("version") or None,
-            ecosystem=data.get("ecosystem", ""),
-            status=data.get("status", "pending"),
-            verdict=data.get("verdict") or None,
-            probability=probability,
-            features=features,
-            error=data.get("error") or None,
-        ))
+            raw_prob = data.get("probability")
+            packages.append(PackageResult(
+                name=data.get("name", ""),
+                version=data.get("version") or None,
+                ecosystem=data.get("ecosystem", ""),
+                status=data.get("status", "pending"),
+                verdict=data.get("verdict") or None,
+                probability=float(raw_prob) if raw_prob else None,
+                features=features,
+                error=data.get("error") or None,
+            ))
 
     done_count = sum(1 for p in packages if p.status in ("done", "error"))
     total = int(meta.get("total", 0))

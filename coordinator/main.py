@@ -115,11 +115,19 @@ def submit_job(job_id: str, request: JobSubmitRequest):
     if r.exists(job_meta_key(job_id)):
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Job already exists")
 
-    packages_dicts = [p.model_dump() for p in request.packages]
-    create_job(r, job_id, packages_dicts)
+    # Deduplicate by package identity so each key gets exactly one worker task.
+    seen: set[str] = set()
+    unique_packages = []
+    for pkg in request.packages:
+        pk = make_pkg_key(pkg.name, pkg.version, pkg.ecosystem)
+        if pk not in seen:
+            seen.add(pk)
+            unique_packages.append(pkg)
+
+    create_job(r, job_id, [p.model_dump() for p in unique_packages])
 
     q = _get_queue()
-    for pkg in request.packages:
+    for pkg in unique_packages:
         pk = make_pkg_key(pkg.name, pkg.version, pkg.ecosystem)
         q.enqueue(
             "worker.task.analyze_package",
@@ -133,8 +141,9 @@ def submit_job(job_id: str, request: JobSubmitRequest):
             job_timeout=JOB_TIMEOUT,
         )
 
-    _ensure_workers(len(request.packages))
-    return {"job_id": job_id, "queued": len(request.packages)}
+    skipped = len(request.packages) - len(unique_packages)
+    _ensure_workers(len(unique_packages))
+    return {"job_id": job_id, "queued": len(unique_packages), "skipped_duplicates": skipped}
 
 
 @app.post("/jobs/{job_id}/upload", status_code=status.HTTP_202_ACCEPTED)
