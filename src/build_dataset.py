@@ -2,6 +2,7 @@ import argparse
 import concurrent.futures
 import re
 from pathlib import Path
+from datetime import datetime
 
 import pandas as pd
 from tqdm import tqdm
@@ -198,21 +199,19 @@ def process_archive(package_input: Path) -> dict[str, object]:
         }
 
     raw_root = _WORKER_RAW_ROOT or Path(".")
+    row = {
+        "package_name": package_name_from_input(package_input),
+        "ecosystem": ecosystem,
+        "max_entropy": max_entropy,
+        "avg_entropy": avg_entropy,
+        "label": label,
+    }
+    row.update(ast_counts)
     return {
         "ok": True,
         "path": str(package_input),
         "path_id": package_input_id(package_input, raw_root),
-        "row": {
-            "package_name": package_name_from_input(package_input),
-            "ecosystem": ecosystem,
-            "max_entropy": max_entropy,
-            "avg_entropy": avg_entropy,
-            "eval_count": ast_counts.get("eval_count", 0),
-            "exec_count": ast_counts.get("exec_count", 0),
-            "base64_count": ast_counts.get("base64_count", 0),
-            "network_imports": ast_counts.get("network_imports", 0),
-            "label": label,
-        },
+        "row": row,
     }
 
 
@@ -266,6 +265,17 @@ def main() -> int:
 
     dataset = pd.DataFrame(rows)
     output_csv.parent.mkdir(parents=True, exist_ok=True)
+    # Ensure datasets are saved with timestamped filenames: dataset-DD-MM-YYYY-HHMMSS.csv
+    try:
+        timestamp = datetime.now().strftime("%d-%m-%Y-%H%M%S")
+    except Exception:
+        timestamp = "unknown-time"
+
+    # If the user provided the default `dataset.csv` or a generic `dataset` stem,
+    # override it to the timestamped naming to maintain consistent dataset snapshots.
+    if output_csv.name.lower() == "dataset.csv" or output_csv.stem.lower() == "dataset":
+        output_csv = output_csv.parent / f"dataset-{timestamp}.csv"
+
     dataset.to_csv(output_csv, index=False)
 
     missing_ids = sorted(expected_ids - processed_ids)

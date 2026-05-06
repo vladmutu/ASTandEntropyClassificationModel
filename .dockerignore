@@ -1,0 +1,15 @@
+data/
+data_list/
+docs/
+.claude/
+__pycache__/
+*.pyc
+*.pyo
+.git/
+*.ipynb_checkpoints/
+malware_classifier.pkl
+malware_classifier_baseline.pkl
+malware_threshold.pkl
+dataset.csv
+dataset_validation.txt
+missing_packages.log

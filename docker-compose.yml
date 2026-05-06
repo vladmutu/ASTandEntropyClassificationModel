@@ -1,0 +1,59 @@
+networks:
+  malware-net:
+    name: malware-classifier-net
+
+services:
+  redis:
+    image: redis:7-alpine
+    networks: [malware-net]
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  coordinator:
+    build:
+      context: .
+      dockerfile: Dockerfile.coordinator
+    networks: [malware-net]
+    ports:
+      - "8090:8090"
+    environment:
+      REDIS_URL: redis://redis:6379
+      QUEUE_NAME: analysis
+      JOB_TIMEOUT: "180"
+      # Dynamic worker scaling
+      WORKER_IMAGE: malware-classifier/worker:latest
+      WORKER_NETWORK: malware-classifier-net
+      MAX_WORKERS: "10"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
+    image: malware-classifier/worker:latest
+    networks: [malware-net]
+    environment:
+      REDIS_URL: redis://redis:6379
+      MODEL_PATH: /app/lightgbm_model.pkl
+      THRESHOLD_PATH: /app/lightgbm_threshold.pkl
+      DOWNLOAD_TIMEOUT: "30"
+    depends_on:
+      redis:
+        condition: service_healthy
+    # Coordinator starts burst workers dynamically; static replicas set to 0.
+    deploy:
+      replicas: 0
+
+volumes:
+  redis-data:

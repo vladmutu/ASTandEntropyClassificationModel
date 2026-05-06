@@ -1,0 +1,24 @@
+# Feature extraction (existing)
+requests
+pandas
+numpy
+esprima
+joblib
+
+
+# Model
+lightgbm
+scikit-learn
+tqdm
+# API framework
+fastapi
+uvicorn[standard]
+pydantic>=2.0
+python-multipart
+
+# Queue and store
+redis
+rq
+
+# Docker SDK (coordinator uses this to scale burst workers)
+docker

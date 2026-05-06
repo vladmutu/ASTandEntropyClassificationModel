@@ -8,3 +8,8 @@ scikit-learn
 matplotlib
 seaborn
 joblib
+lightgbm
+fastapi
+uvicorn[standard]
+redis
+rq
