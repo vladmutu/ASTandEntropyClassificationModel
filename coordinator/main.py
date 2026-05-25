@@ -1,78 +1,96 @@
 from __future__ import annotations
 
+import asyncio
+import json
 import os
 from contextlib import asynccontextmanager
-from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
 import redis as redis_lib
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile, status
+from fastapi.responses import StreamingResponse
 from rq import Queue
 
-from coordinator.models import JobResponse, JobSubmitRequest, PackageResult
+from coordinator.models import JobSubmitRequest, PackageResult
 from coordinator.store import (
     ALLOWED_UPLOAD_SUFFIXES,
     JOB_TTL,
     UPLOAD_SIZE_LIMIT,
     VALID_ECOSYSTEMS,
-    create_job,
-    delete_job,
-    get_job,
-    job_meta_key,
     make_pkg_key,
-    pkg_redis_key,
     store_upload,
 )
 
 REDIS_URL = os.getenv("REDIS_URL", "redis://redis:6379")
 QUEUE_NAME = os.getenv("QUEUE_NAME", "analysis")
 JOB_TIMEOUT = int(os.getenv("JOB_TIMEOUT", "180"))
-MAX_WORKERS = int(os.getenv("MAX_WORKERS", "10"))
+MAX_WORKERS = int(os.getenv("MAX_WORKERS", "15"))
 WORKER_IMAGE = os.getenv("WORKER_IMAGE", "")
 WORKER_NETWORK = os.getenv("WORKER_NETWORK", "")
+COORDINATOR_URL = os.getenv("COORDINATOR_URL", "http://coordinator:8090")
+BURST_LABEL = "malware-classifier.burst"
 
 _redis: redis_lib.Redis | None = None
 _queue: Queue | None = None
 
+# In-memory delivery queues: job_id → asyncio.Queue of PackageResult
+_result_queues: dict[str, asyncio.Queue] = {}
+
 
 def _ensure_workers(num_packages: int) -> None:
-    """Start burst worker containers up to min(num_packages, MAX_WORKERS).
+    """Start burst worker containers so that running + new == min(num_packages, MAX_WORKERS).
 
     Workers use --burst so they exit (and auto-remove) when the queue empties.
     No-op when WORKER_IMAGE / WORKER_NETWORK are not configured (e.g. K8s).
     """
     if not WORKER_IMAGE or not WORKER_NETWORK:
         return
-    desired = min(num_packages, MAX_WORKERS)
     try:
         import docker as docker_sdk
         client = docker_sdk.from_env()
         running = client.containers.list(
-            filters={"label": "com.docker.compose.service=worker", "status": "running"}
+            filters={"label": f"{BURST_LABEL}=true", "status": "running"}
         )
-        to_start = desired - len(running)
-        if to_start <= 0:
-            return
-        for _ in range(to_start):
-            client.containers.run(
+    except Exception as exc:
+        print(f"[scaling] WARNING: docker client init failed: {exc}", flush=True)
+        return
+
+    to_start = min(num_packages, max(0, MAX_WORKERS - len(running)))
+    if to_start <= 0:
+        return
+
+    started = 0
+    for _ in range(to_start):
+        try:
+            resp = client.api.create_container(
                 image=WORKER_IMAGE,
                 command=["rq", "worker", "analysis", "--url", REDIS_URL, "--burst"],
-                detach=True,
-                remove=True,
-                network=WORKER_NETWORK,
-                labels={"com.docker.compose.service": "worker"},
                 environment={
                     "REDIS_URL": REDIS_URL,
+                    "COORDINATOR_URL": COORDINATOR_URL,
                     "MODEL_PATH": "/app/lightgbm_model.pkl",
                     "THRESHOLD_PATH": "/app/lightgbm_threshold.pkl",
                     "DOWNLOAD_TIMEOUT": "30",
                 },
+                labels={BURST_LABEL: "true"},
                 user="1000",
+                host_config=client.api.create_host_config(
+                    auto_remove=True,
+                    network_mode=WORKER_NETWORK,
+                ),
             )
-        print(f"[scaling] started {to_start} burst worker(s) (total desired={desired})", flush=True)
-    except Exception as exc:
-        print(f"[scaling] WARNING: worker scaling failed: {exc}", flush=True)
+            client.api.start(resp["Id"])
+            started += 1
+        except Exception as exc:
+            print(f"[scaling] WARNING: failed to start a worker: {exc}", flush=True)
+
+    if started:
+        print(
+            f"[scaling] started {started}/{to_start} burst worker(s)"
+            f" (running={len(running)}, requested={num_packages})",
+            flush=True,
+        )
 
 
 @asynccontextmanager
@@ -81,10 +99,21 @@ async def lifespan(app: FastAPI):
     _redis = redis_lib.from_url(REDIS_URL, decode_responses=True)
     _queue = Queue(QUEUE_NAME, connection=redis_lib.from_url(REDIS_URL))
     yield
+    # On shutdown, stop all burst worker containers so they don't outlive the stack.
+    if WORKER_IMAGE and WORKER_NETWORK:
+        try:
+            import docker as docker_sdk
+            client = docker_sdk.from_env()
+            for container in client.containers.list(
+                filters={"label": f"{BURST_LABEL}=true", "status": "running"}
+            ):
+                container.stop(timeout=5)
+        except Exception as exc:
+            print(f"[scaling] WARNING: failed to stop burst workers on shutdown: {exc}", flush=True)
     _redis.close()
 
 
-app = FastAPI(title="Malware Classifier Coordinator", version="1.0.0", lifespan=lifespan)
+app = FastAPI(title="Malware Classifier Coordinator", version="2.0.0", lifespan=lifespan)
 
 
 def _get_redis() -> redis_lib.Redis:
@@ -102,8 +131,18 @@ def health():
     return {"status": "ok"}
 
 
-@app.post("/jobs/{job_id}", status_code=status.HTTP_202_ACCEPTED)
-def submit_job(job_id: str, request: JobSubmitRequest):
+@app.post("/internal/result/{job_id}", include_in_schema=False)
+async def receive_result(job_id: str, result: PackageResult):
+    """Called by workers when a package analysis finishes. Delivers result to the waiting stream."""
+    q = _result_queues.get(job_id)
+    if q is not None:
+        await q.put(result)
+    return {"ok": True}
+
+
+@app.post("/jobs/{job_id}")
+@app.post("/analyze/{job_id}")
+async def submit_job(job_id: str, request: JobSubmitRequest):
     for pkg in request.packages:
         if pkg.ecosystem.lower() not in VALID_ECOSYSTEMS:
             raise HTTPException(
@@ -111,45 +150,66 @@ def submit_job(job_id: str, request: JobSubmitRequest):
                 detail=f"Invalid ecosystem '{pkg.ecosystem}'. Must be one of: {sorted(VALID_ECOSYSTEMS)}",
             )
 
-    r = _get_redis()
-    if r.exists(job_meta_key(job_id)):
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Job already exists")
+    total = len(request.packages)
 
-    # Deduplicate by package identity so each key gets exactly one worker task.
-    seen: set[str] = set()
-    unique_packages = []
+    # Register delivery queue BEFORE enqueuing RQ tasks to avoid any race
+    q: asyncio.Queue = asyncio.Queue()
+    _result_queues[job_id] = q
+
+    rq = _get_queue()
     for pkg in request.packages:
-        pk = make_pkg_key(pkg.name, pkg.version, pkg.ecosystem)
-        if pk not in seen:
-            seen.add(pk)
-            unique_packages.append(pkg)
-
-    create_job(r, job_id, [p.model_dump() for p in unique_packages])
-
-    q = _get_queue()
-    for pkg in unique_packages:
-        pk = make_pkg_key(pkg.name, pkg.version, pkg.ecosystem)
-        q.enqueue(
+        callback_url = f"{COORDINATOR_URL}/internal/result/{job_id}"
+        rq.enqueue(
             "worker.task.analyze_package",
             kwargs={
                 "job_id": job_id,
-                "pkg_key": pk,
+                "package_uuid": pkg.package_uuid,
                 "name": pkg.name,
                 "version": pkg.version,
                 "ecosystem": pkg.ecosystem.lower(),
+                "callback_url": callback_url,
             },
-            job_timeout=JOB_TIMEOUT,
+            job_timeout=max(30, JOB_TIMEOUT - 30),
         )
 
-    skipped = len(request.packages) - len(unique_packages)
-    _ensure_workers(len(unique_packages))
-    return {"job_id": job_id, "queued": len(unique_packages), "skipped_duplicates": skipped}
+    _ensure_workers(total)
+
+    pending: dict[str, object] = {pkg.package_uuid: pkg for pkg in request.packages}
+
+    async def generate():
+        try:
+            received = 0
+            while received < total:
+                try:
+                    result: PackageResult = await asyncio.wait_for(q.get(), timeout=JOB_TIMEOUT)
+                    pending.pop(result.package_uuid, None)
+                    yield json.dumps(result.model_dump()) + "\n"
+                    received += 1
+                except asyncio.TimeoutError:
+                    break
+        finally:
+            for pkg in pending.values():
+                yield json.dumps({
+                    "package_uuid": pkg.package_uuid,
+                    "name": pkg.name,
+                    "version": pkg.version,
+                    "ecosystem": pkg.ecosystem,
+                    "status": "timeout",
+                    "verdict": None,
+                    "probability": None,
+                    "features": None,
+                    "error": "Analysis timed out",
+                }) + "\n"
+            _result_queues.pop(job_id, None)
+
+    return StreamingResponse(generate(), media_type="application/x-ndjson")
 
 
-@app.post("/jobs/{job_id}/upload", status_code=status.HTTP_202_ACCEPTED)
+@app.post("/jobs/{job_id}/upload")
 async def upload_package(
     job_id: str,
     file: UploadFile = File(...),
+    package_uuid: str = Form(...),
     name: str = Form(default=""),
 ):
     filename = file.filename or "package"
@@ -171,62 +231,46 @@ async def upload_package(
     pkg_key = make_pkg_key(pkg_name, None, "upload")
 
     r = _get_redis()
-    if r.exists(job_meta_key(job_id)):
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Job already exists")
-
     store_upload(r, job_id, pkg_key, data)
-    create_job(r, job_id, [{"name": pkg_name, "version": None, "ecosystem": "upload"}])
 
+    # Register delivery queue BEFORE enqueuing RQ task
+    q: asyncio.Queue = asyncio.Queue()
+    _result_queues[job_id] = q
+
+    callback_url = f"{COORDINATOR_URL}/internal/result/{job_id}"
     _get_queue().enqueue(
         "worker.task.analyze_uploaded_package",
-        kwargs={"job_id": job_id, "pkg_key": pkg_key, "name": pkg_name, "filename": filename},
-        job_timeout=JOB_TIMEOUT,
+        kwargs={
+            "job_id": job_id,
+            "package_uuid": package_uuid,
+            "pkg_key": pkg_key,
+            "name": pkg_name,
+            "filename": filename,
+            "callback_url": callback_url,
+        },
+        job_timeout=max(30, JOB_TIMEOUT - 30),
     )
 
     _ensure_workers(1)
-    return {"job_id": job_id, "queued": 1, "filename": filename}
 
-
-@app.get("/jobs/{job_id}", response_model=JobResponse)
-def get_job_status(job_id: str):
-    result = get_job(_get_redis(), job_id)
-    if result is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Job not found")
-    return result
-
-
-@app.get("/jobs/{job_id}/packages/{pkg_key:path}", response_model=PackageResult)
-def get_package_result(job_id: str, pkg_key: str):
-    r = _get_redis()
-    if not r.exists(job_meta_key(job_id)):
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Job not found")
-
-    import json
-
-    data = r.hgetall(pkg_redis_key(job_id, pkg_key))
-    if not data:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Package not found in job")
-
-    features = None
-    if data.get("features"):
+    async def generate():
         try:
-            features = json.loads(data["features"])
-        except (json.JSONDecodeError, TypeError):
-            pass
+            try:
+                result: PackageResult = await asyncio.wait_for(q.get(), timeout=JOB_TIMEOUT)
+                yield json.dumps(result.model_dump()) + "\n"
+            except asyncio.TimeoutError:
+                yield json.dumps({
+                    "package_uuid": package_uuid,
+                    "name": pkg_name,
+                    "version": None,
+                    "ecosystem": "upload",
+                    "status": "timeout",
+                    "verdict": None,
+                    "probability": None,
+                    "features": None,
+                    "error": "Analysis timed out",
+                }) + "\n"
+        finally:
+            _result_queues.pop(job_id, None)
 
-    return PackageResult(
-        name=data.get("name", ""),
-        version=data.get("version") or None,
-        ecosystem=data.get("ecosystem", ""),
-        status=data.get("status", "pending"),
-        verdict=data.get("verdict") or None,
-        probability=float(data["probability"]) if data.get("probability") else None,
-        features=features,
-        error=data.get("error") or None,
-    )
-
-
-@app.delete("/jobs/{job_id}", status_code=status.HTTP_204_NO_CONTENT)
-def cancel_job(job_id: str):
-    if not delete_job(_get_redis(), job_id):
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Job not found")
+    return StreamingResponse(generate(), media_type="application/x-ndjson")

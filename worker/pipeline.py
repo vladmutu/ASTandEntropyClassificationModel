@@ -40,10 +40,12 @@ def build_feature_vector(
         else:
             raise ValueError(f"Unknown ecosystem: {ecosystem!r}")
 
-        with tempfile.TemporaryDirectory() as tmpdir:
-            dest = Path(tmpdir) / filename
-            download_file(session, url, dest)
-            return extract_entropy_and_code_features(dest)
+        # No cleanup: worker containers are ephemeral; Docker removes /tmp on exit.
+        # Explicit recursive deletion of extracted files can take minutes for large packages.
+        tmpdir = tempfile.mkdtemp()
+        dest = Path(tmpdir) / filename
+        download_file(session, url, dest)
+        return extract_entropy_and_code_features(dest)
 
 
 def build_feature_vector_from_file(archive_path: Path) -> tuple[float, float, dict]:

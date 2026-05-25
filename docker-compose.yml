@@ -30,7 +30,7 @@ services:
       # Dynamic worker scaling
       WORKER_IMAGE: malware-classifier/worker:latest
       WORKER_NETWORK: malware-classifier-net
-      MAX_WORKERS: "10"
+      MAX_WORKERS: "15"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
     depends_on:
@@ -47,6 +47,7 @@ services:
       REDIS_URL: redis://redis:6379
       MODEL_PATH: /app/lightgbm_model.pkl
       THRESHOLD_PATH: /app/lightgbm_threshold.pkl
+      COORDINATOR_URL: http://coordinator:8090
       DOWNLOAD_TIMEOUT: "30"
     depends_on:
       redis:

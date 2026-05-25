@@ -1,12 +1,12 @@
 from __future__ import annotations
 
-from datetime import datetime
 from typing import Optional
 
 from pydantic import BaseModel, Field
 
 
 class PackageSpec(BaseModel):
+    package_uuid: str
     name: str
     version: Optional[str] = None
     ecosystem: str  # "npm" or "pypi"
@@ -17,6 +17,7 @@ class JobSubmitRequest(BaseModel):
 
 
 class PackageResult(BaseModel):
+    package_uuid: str
     name: str
     version: Optional[str]
     ecosystem: str
@@ -25,12 +26,3 @@ class PackageResult(BaseModel):
     probability: Optional[float] = None
     features: Optional[dict[str, float]] = None
     error: Optional[str] = None
-
-
-class JobResponse(BaseModel):
-    job_id: str
-    status: str  # pending | running | done
-    total: int
-    done: int
-    created_at: datetime
-    packages: list[PackageResult]
