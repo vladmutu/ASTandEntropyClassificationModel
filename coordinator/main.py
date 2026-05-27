@@ -3,7 +3,9 @@ from __future__ import annotations
 import asyncio
 import json
 import os
+import time
 from contextlib import asynccontextmanager
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
@@ -36,6 +38,8 @@ _queue: Queue | None = None
 
 # In-memory delivery queues: job_id → asyncio.Queue of PackageResult
 _result_queues: dict[str, asyncio.Queue] = {}
+# Total expected results per job (needed to send cancellation sentinels)
+_job_totals: dict[str, int] = {}
 
 
 def _ensure_workers(num_packages: int) -> None:
@@ -60,12 +64,16 @@ def _ensure_workers(num_packages: int) -> None:
     if to_start <= 0:
         return
 
+    # Worker TTL: force-exit after JOB_TIMEOUT + 60 s so burst workers never zombie.
+    worker_ttl = str(JOB_TIMEOUT + 60)
+
     started = 0
     for _ in range(to_start):
         try:
             resp = client.api.create_container(
                 image=WORKER_IMAGE,
-                command=["rq", "worker", "analysis", "--url", REDIS_URL, "--burst"],
+                command=["rq", "worker", "analysis", "--url", REDIS_URL, "--burst",
+                         "--worker-ttl", worker_ttl],
                 environment={
                     "REDIS_URL": REDIS_URL,
                     "COORDINATOR_URL": COORDINATOR_URL,
@@ -93,12 +101,55 @@ def _ensure_workers(num_packages: int) -> None:
         )
 
 
+async def _cleanup_stale_workers() -> None:
+    """Background coroutine: kill burst workers alive longer than JOB_TIMEOUT * 2 seconds."""
+    max_age = JOB_TIMEOUT * 2
+    while True:
+        await asyncio.sleep(60)
+        if not WORKER_IMAGE or not WORKER_NETWORK:
+            continue
+        try:
+            import docker as docker_sdk
+            client = docker_sdk.from_env()
+            now = time.time()
+            for container in client.containers.list(
+                filters={"label": f"{BURST_LABEL}=true", "status": "running"}
+            ):
+                created_str = container.attrs.get("Created", "")
+                if not created_str:
+                    continue
+                try:
+                    created_at = datetime.fromisoformat(created_str.replace("Z", "+00:00"))
+                    age = now - created_at.timestamp()
+                    if age > max_age:
+                        print(
+                            f"[cleanup] Killing stale burst worker {container.id[:12]}"
+                            f" (age={age:.0f}s > max={max_age}s)",
+                            flush=True,
+                        )
+                        container.stop(timeout=5)
+                except Exception:
+                    pass
+        except Exception as exc:
+            print(f"[cleanup] WARNING: stale worker check failed: {exc}", flush=True)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     global _redis, _queue
     _redis = redis_lib.from_url(REDIS_URL, decode_responses=True)
     _queue = Queue(QUEUE_NAME, connection=redis_lib.from_url(REDIS_URL))
+
+    cleanup_task = asyncio.create_task(_cleanup_stale_workers())
+
     yield
+
+    cleanup_task.cancel()
+    try:
+        await cleanup_task
+    except asyncio.CancelledError:
+        pass
+
     # On shutdown, stop all burst worker containers so they don't outlive the stack.
     if WORKER_IMAGE and WORKER_NETWORK:
         try:
@@ -140,6 +191,18 @@ async def receive_result(job_id: str, result: PackageResult):
     return {"ok": True}
 
 
+@app.delete("/jobs/{job_id}")
+async def cancel_job(job_id: str):
+    """Cancel a pending job: unblocks the generate() stream immediately via sentinel values."""
+    q = _result_queues.pop(job_id, None)
+    total = _job_totals.pop(job_id, 0)
+    if q is not None:
+        # Fill the queue with None sentinels so the waiting generate() coroutine exits promptly.
+        for _ in range(total + 1):
+            q.put_nowait(None)
+    return {"ok": True}
+
+
 @app.post("/jobs/{job_id}")
 @app.post("/analyze/{job_id}")
 async def submit_job(job_id: str, request: JobSubmitRequest):
@@ -155,6 +218,7 @@ async def submit_job(job_id: str, request: JobSubmitRequest):
     # Register delivery queue BEFORE enqueuing RQ tasks to avoid any race
     q: asyncio.Queue = asyncio.Queue()
     _result_queues[job_id] = q
+    _job_totals[job_id] = total
 
     rq = _get_queue()
     for pkg in request.packages:
@@ -181,7 +245,9 @@ async def submit_job(job_id: str, request: JobSubmitRequest):
             received = 0
             while received < total:
                 try:
-                    result: PackageResult = await asyncio.wait_for(q.get(), timeout=JOB_TIMEOUT)
+                    result: PackageResult | None = await asyncio.wait_for(q.get(), timeout=JOB_TIMEOUT)
+                    if result is None:  # cancellation sentinel
+                        break
                     pending.pop(result.package_uuid, None)
                     yield json.dumps(result.model_dump()) + "\n"
                     received += 1
@@ -201,6 +267,7 @@ async def submit_job(job_id: str, request: JobSubmitRequest):
                     "error": "Analysis timed out",
                 }) + "\n"
             _result_queues.pop(job_id, None)
+            _job_totals.pop(job_id, None)
 
     return StreamingResponse(generate(), media_type="application/x-ndjson")
 
@@ -236,6 +303,7 @@ async def upload_package(
     # Register delivery queue BEFORE enqueuing RQ task
     q: asyncio.Queue = asyncio.Queue()
     _result_queues[job_id] = q
+    _job_totals[job_id] = 1
 
     callback_url = f"{COORDINATOR_URL}/internal/result/{job_id}"
     _get_queue().enqueue(
@@ -256,8 +324,21 @@ async def upload_package(
     async def generate():
         try:
             try:
-                result: PackageResult = await asyncio.wait_for(q.get(), timeout=JOB_TIMEOUT)
-                yield json.dumps(result.model_dump()) + "\n"
+                result: PackageResult | None = await asyncio.wait_for(q.get(), timeout=JOB_TIMEOUT)
+                if result is not None:
+                    yield json.dumps(result.model_dump()) + "\n"
+                else:
+                    yield json.dumps({
+                        "package_uuid": package_uuid,
+                        "name": pkg_name,
+                        "version": None,
+                        "ecosystem": "upload",
+                        "status": "timeout",
+                        "verdict": None,
+                        "probability": None,
+                        "features": None,
+                        "error": "Analysis cancelled",
+                    }) + "\n"
             except asyncio.TimeoutError:
                 yield json.dumps({
                     "package_uuid": package_uuid,
@@ -272,5 +353,6 @@ async def upload_package(
                 }) + "\n"
         finally:
             _result_queues.pop(job_id, None)
+            _job_totals.pop(job_id, None)
 
     return StreamingResponse(generate(), media_type="application/x-ndjson")
