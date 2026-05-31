@@ -11,6 +11,7 @@ from tqdm import tqdm
 
 
 PYPI_ROOT = "https://pypi.org/pypi"
+TEST_PYPI_ROOT = "https://test.pypi.org/pypi"
 NPM_ROOT = "https://registry.npmjs.org"
 REQUEST_TIMEOUT = 20
 CHUNK_SIZE = 1024 * 128
@@ -162,28 +163,27 @@ def log_missing(log_path: Path, task: PackageTask, reason: str) -> None:
         handle.write(entry)
 
 
-def get_pypi_download_info(session: requests.Session, task: PackageTask) -> tuple[str, str]:
-    package_name = re.sub(r"[-_.]+", "-", task.name).lower()
-    if task.version:
-        metadata_url = f"{PYPI_ROOT}/{package_name}/{task.version}/json"
-    else:
-        metadata_url = f"{PYPI_ROOT}/{package_name}/json"
+def _query_pypi_root(session: requests.Session, root: str, package_name: str, version: Optional[str]) -> tuple[str, str]:
+    """Try to resolve a download URL from a single PyPI-compatible registry root.
 
-    try:
+    Attempts the versioned endpoint first; falls back to the /json (latest)
+    endpoint if a specific version was requested but returns 404.
+    Raises requests.HTTPError if both attempts fail.
+    """
+    if version:
+        metadata_url = f"{root}/{package_name}/{version}/json"
+    else:
+        metadata_url = f"{root}/{package_name}/json"
+
+    print(f"  -> Querying PyPI API: {metadata_url}")
+    response = session.get(metadata_url, timeout=REQUEST_TIMEOUT)
+    if response.status_code != 200 and version is not None:
+        metadata_url = f"{root}/{package_name}/json"
         print(f"  -> Querying PyPI API: {metadata_url}")
         response = session.get(metadata_url, timeout=REQUEST_TIMEOUT)
-        response.raise_for_status()
-    except requests.HTTPError:
-        if task.version is not None:
-            metadata_url = f"{PYPI_ROOT}/{package_name}/json"
-            print(f"  -> Querying PyPI API: {metadata_url}")
-            response = session.get(metadata_url, timeout=REQUEST_TIMEOUT)
-            response.raise_for_status()
-        else:
-            raise
+    response.raise_for_status()
 
     payload = response.json()
-
     candidates = payload.get("urls", [])
     selected = None
 
@@ -207,6 +207,18 @@ def get_pypi_download_info(session: requests.Session, task: PackageTask) -> tupl
         raise ValueError("Incomplete PyPI artifact metadata")
 
     return url, filename
+
+
+def get_pypi_download_info(session: requests.Session, task: PackageTask) -> tuple[str, str]:
+    package_name = re.sub(r"[-_.]+", "-", task.name).lower()
+    last_exc: Exception = ValueError("No PyPI registry succeeded")
+    for root in (PYPI_ROOT, TEST_PYPI_ROOT):
+        try:
+            return _query_pypi_root(session, root, package_name, task.version)
+        except (requests.HTTPError, requests.RequestException) as exc:
+            print(f"  -> {root} unavailable for {package_name}: {exc}")
+            last_exc = exc
+    raise last_exc
 
 
 def get_npm_download_info(session: requests.Session, task: PackageTask) -> tuple[str, str]:
